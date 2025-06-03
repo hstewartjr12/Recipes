@@ -22,13 +22,15 @@ struct RecipeDetail: View {
             }
             .frame(width: 350, height: 350)
             HStack {
-                if recipe.source_url != nil {
-                    Link("Source", destination: URL(string: recipe.source_url!)!)
+                if let source = recipe.source_url,
+                   let url = URL(string: source) {
+                    Link("Source", destination: url)
                         .buttonStyle(.borderedProminent)
                         .padding()
                 }
-                if recipe.youtube_url != nil {
-                    Link("YouTube", destination: URL(string: recipe.youtube_url!)!)
+                if let youtube = recipe.youtube_url,
+                   let url = URL(string: youtube) {
+                    Link("YouTube", destination: url)
                         .buttonStyle(.borderedProminent)
                         .padding()
                 }
@@ -39,4 +41,5 @@ struct RecipeDetail: View {
 }
 
 #Preview {
+    RecipeDetail(recipe: .sample)
 }

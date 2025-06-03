@@ -27,9 +27,19 @@ struct Recipe: Codable, Identifiable {
     }
 }
 
-//extension Recipe {
-//    static let sample = Recipe(cuisine: "Italian", name: "Chicken Parmesan", photo_url_large: "", photo_url_small: "", source_url: "Please provide a source URL", id: UUID().uuidString, youtube_url: "Please provide a YouTube URL")
-//}
+
+extension Recipe {
+    /// Convenience sample data used for SwiftUI previews.
+    static let sample = Recipe(
+        cuisine: "Italian",
+        name: "Chicken Parmesan",
+        photo_url_large: "https://example.com/large.jpg",
+        photo_url_small: "https://example.com/small.jpg",
+        source_url: "https://example.com",
+        id: UUID().uuidString,
+        youtube_url: "https://youtube.com/watch?v=1234"
+    )
+}
 
 struct RecipesJSONResponse: Codable {
     let recipes: [Recipe]

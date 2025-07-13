@@ -11,31 +11,64 @@ struct RecipeDetail: View {
     let recipe: Recipe
     
     var body: some View {
-        VStack {
-            Text(recipe.name)
-                .font(.title)
-                .fontWeight(.bold)
-            AsyncImage(url: URL(string: recipe.photo_url_large)) { image in
-                image.resizable()
-            } placeholder: {
-                ProgressView()
-            }
-            .frame(width: 350, height: 350)
-            HStack {
-                if let source = recipe.source_url,
-                   let url = URL(string: source) {
-                    Link("Source", destination: url)
-                        .buttonStyle(.borderedProminent)
-                        .padding()
+        ZStack {
+            LinearGradient(
+                colors: [Color.orange.opacity(0.12), .accentColor.opacity(0.08), .white],
+                startPoint: .top, endPoint: .bottom
+            )
+            .ignoresSafeArea()
+            VStack(spacing: 18) {
+                Text(recipe.name)
+                    .font(.largeTitle)
+                    .bold()
+                    .foregroundStyle(LinearGradient(colors: [.accentColor, .orange], startPoint: .leading, endPoint: .trailing))
+                    .shadow(radius: 3, x: 0, y: 2)
+                    .padding(.top, 18)
+                Text(recipe.cuisine)
+                    .font(.headline)
+                    .foregroundColor(.accentColor)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Capsule().fill(Color.accentColor.opacity(0.15)))
+                ZStack {
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .fill(.ultraThinMaterial)
+                        .shadow(color: .black.opacity(0.08), radius: 8, x: 0, y: 4)
+                    AsyncImage(url: URL(string: recipe.photo_url_large)) { image in
+                        image.resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 290, height: 290)
+                            .clipShape(RoundedRectangle(cornerRadius: 18))
+                            .overlay(RoundedRectangle(cornerRadius: 18).stroke(Color.accentColor.opacity(0.13), lineWidth: 2))
+                    } placeholder: {
+                        ProgressView()
+                            .frame(width: 290, height: 290)
+                    }
                 }
-                if let youtube = recipe.youtube_url,
-                   let url = URL(string: youtube) {
-                    Link("YouTube", destination: url)
-                        .buttonStyle(.borderedProminent)
-                        .padding()
+                .frame(width: 305, height: 305)
+                Spacer().frame(height: 12)
+                HStack(spacing: 20) {
+                    if let source = recipe.source_url, let url = URL(string: source) {
+                        Link(destination: url) {
+                            Label("Source", systemImage: "book.fill")
+                                .padding(10)
+                                .background(Capsule().fill(Color.accentColor.opacity(0.14)))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if let youtube = recipe.youtube_url, let url = URL(string: youtube) {
+                        Link(destination: url) {
+                            Label("YouTube", systemImage: "play.rectangle.fill")
+                                .padding(10)
+                                .background(Capsule().fill(Color.red.opacity(0.13)))
+                        }
+                        .buttonStyle(.plain)
+                    }
                 }
+                .padding(.vertical, 7)
+                Spacer()
             }
-            Spacer()
+            .padding()
         }
     }
 }

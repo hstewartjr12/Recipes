@@ -9,7 +9,9 @@ import SwiftUI
 
 struct RecipeDetail: View {
     let recipe: Recipe
-    
+    let favoriteIDs: Set<String>
+    let onToggleFavorite: (Recipe) -> Void
+
     var body: some View {
         ZStack {
             LinearGradient(
@@ -18,12 +20,23 @@ struct RecipeDetail: View {
             )
             .ignoresSafeArea()
             VStack(spacing: 18) {
-                Text(recipe.name)
-                    .font(.largeTitle)
-                    .bold()
-                    .foregroundStyle(LinearGradient(colors: [.accentColor, .orange], startPoint: .leading, endPoint: .trailing))
-                    .shadow(radius: 3, x: 0, y: 2)
-                    .padding(.top, 18)
+                HStack(spacing: 14) {
+                    Text(recipe.name)
+                        .font(.largeTitle)
+                        .bold()
+                        .foregroundStyle(LinearGradient(colors: [.accentColor, .orange], startPoint: .leading, endPoint: .trailing))
+                        .shadow(radius: 3, x: 0, y: 2)
+                    Button(action: { onToggleFavorite(recipe) }) {
+                        Image(systemName: favoriteIDs.contains(recipe.id) ? "heart.fill" : "heart")
+                            .font(.system(size: 22, weight: .bold))
+                            .foregroundColor(.red.opacity(0.8))
+                            .padding(10)
+                            .background(Color.white.opacity(0.90))
+                            .clipShape(Circle())
+                            .shadow(radius: 2)
+                    }
+                }
+                .padding(.top, 18)
                 Text(recipe.cuisine)
                     .font(.headline)
                     .foregroundColor(.accentColor)
@@ -74,5 +87,5 @@ struct RecipeDetail: View {
 }
 
 #Preview {
-    RecipeDetail(recipe: .sample)
+    RecipeDetail(recipe: .sample, favoriteIDs: [Recipe.sample.id], onToggleFavorite: { _ in })
 }

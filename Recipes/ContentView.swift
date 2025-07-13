@@ -20,6 +20,23 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @State private var recipes: [Recipe] = []
     @State private var response: RecipesJSONResponse = .init(recipes: [])
+    @State private var searchText: String = ""
+    
+    var filteredRecipes: [Recipe] {
+        guard !searchText.isEmpty else { return recipes }
+        return recipes.filter {
+            $0.name.localizedCaseInsensitiveContains(searchText) ||
+            $0.cuisine.localizedCaseInsensitiveContains(searchText)
+        }
+    }
+
+    var filteredFavoriteRecipes: [Recipe] {
+        guard !searchText.isEmpty else { return recipes.filter { favoriteIDs.contains($0.id) } }
+        return recipes.filter {
+            favoriteIDs.contains($0.id) && ($0.name.localizedCaseInsensitiveContains(searchText) || $0.cuisine.localizedCaseInsensitiveContains(searchText))
+        }
+    }
+    
     @Query(sort: \Favorite.recipeID) private var favorites: [Favorite]
     let columns = [GridItem(.flexible()), GridItem(.flexible())]
     
@@ -27,32 +44,99 @@ struct ContentView: View {
     
     var body: some View {
         TabView {
-            NavigationStack {
-                HomeRecipesGrid(
-                    recipes: recipes,
-                    favoriteIDs: favoriteIDs,
-                    onToggleFavorite: toggleFavorite
-                )
-                .navigationTitle("")
-                .toolbar(.hidden, for: .navigationBar)
-            }
-            .tabItem {
-                Label("Home", systemImage: "house")
+            Tab("Home", systemImage: "house") {
+                NavigationStack {
+                    HomeRecipesGrid(
+                        recipes: filteredRecipes,
+                        favoriteIDs: favoriteIDs,
+                        onToggleFavorite: toggleFavorite
+                    )
+                    .navigationTitle("")
+                }
             }
             
-            NavigationStack {
-                FavoriteRecipesView(
-                    recipes: recipes,
-                    favoriteIDs: favoriteIDs,
-                    onToggleFavorite: toggleFavorite
-                )
-                .navigationTitle("")
-                .toolbar(.hidden, for: .navigationBar)
+            Tab("Favorites", systemImage: "heart.fill") {
+                NavigationStack {
+                    FavoriteRecipesView(
+                        recipes: filteredFavoriteRecipes,
+                        favoriteIDs: favoriteIDs,
+                        onToggleFavorite: toggleFavorite
+                    )
+                    .navigationTitle("")
+                }
             }
-            .tabItem {
-                Label("Favorites", systemImage: "heart.fill")
+            
+            Tab(role: .search) {
+                NavigationStack {
+                    ZStack {
+                        LinearGradient.backgroundGradient.ignoresSafeArea()
+                        VStack(spacing: 4) {
+                            Text("Search Recipes")
+                                .font(.largeTitle)
+                                .bold()
+                                .foregroundStyle(LinearGradient(
+                                    colors: [.accentColor, .orange],
+                                    startPoint: .leading, endPoint: .trailing))
+                                .shadow(radius: 3)
+                            Text("Find the perfect dish to cook")
+                                .font(.subheadline)
+                                .foregroundColor(.secondary)
+                                .padding(.bottom, 5)
+                            ScrollView {
+                                LazyVStack(spacing: 14) {
+                                    ForEach(filteredRecipes) { recipe in
+                                        NavigationLink(destination: RecipeDetail(recipe: recipe, favoriteIDs: favoriteIDs, onToggleFavorite: toggleFavorite)) {
+                                            HStack(spacing: 14) {
+                                                AsyncImage(url: URL(string: recipe.photo_url_large)) { image in
+                                                    image.resizable()
+                                                        .aspectRatio(contentMode: .fill)
+                                                } placeholder: {
+                                                    ProgressView()
+                                                }
+                                                .frame(width: 52, height: 52)
+                                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                                                VStack(alignment: .leading, spacing: 4) {
+                                                    Text(recipe.name)
+                                                        .font(.headline)
+                                                        .bold()
+                                                        .foregroundColor(Color.primary)
+                                                    Text(recipe.cuisine)
+                                                        .font(.subheadline)
+                                                        .foregroundColor(.accentColor)
+                                                        .padding(.horizontal, 10)
+                                                        .padding(.vertical, 2)
+                                                        .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                                                }
+                                                Spacer()
+                                                Button(action: { toggleFavorite(recipe) }) {
+                                                    Image(systemName: favoriteIDs.contains(recipe.id) ? "heart.fill" : "heart")
+                                                        .font(.system(size: 18, weight: .bold))
+                                                        .foregroundColor(.red.opacity(0.7))
+                                                        .padding(8)
+                                                        .background(Color.white.opacity(0.85))
+                                                        .clipShape(Circle())
+                                                        .shadow(radius: 2)
+                                                }
+                                            }
+                                            .padding(12)
+                                            .background(
+                                                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                                                    .fill(.ultraThickMaterial)
+                                                    .shadow(color: Color.black.opacity(0.07), radius: 4, x: 0, y: 2)
+                                            )
+                                        }
+                                    }
+                                }
+                                .padding(.top, 18)
+                                .padding(.horizontal, 12)
+                            }
+                        }
+                        .padding(.horizontal)
+                    }
+                }
             }
         }
+        .searchable(text: $searchText)
         .task {
             do {
                 response = try await fetchData()
@@ -104,7 +188,7 @@ struct HomeRecipesGrid: View {
                 ScrollView(.vertical) {
                     LazyVGrid(columns: columns, spacing: 24) {
                         ForEach(recipes) { recipe in
-                            NavigationLink(destination: RecipeDetail(recipe: recipe)) {
+                            NavigationLink(destination: RecipeDetail(recipe: recipe, favoriteIDs: favoriteIDs, onToggleFavorite: onToggleFavorite)) {
                                 ZStack(alignment: .topTrailing) {
                                     RoundedRectangle(cornerRadius: 18, style: .continuous)
                                         .fill(.ultraThickMaterial)

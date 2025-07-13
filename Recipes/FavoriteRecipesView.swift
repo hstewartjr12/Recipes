@@ -30,52 +30,10 @@ struct FavoriteRecipesView: View {
                     ScrollView(.vertical) {
                         LazyVGrid(columns: columns, spacing: 24) {
                             ForEach(recipes.filter { favoriteIDs.contains($0.id) }) { recipe in
-                                NavigationLink(destination: RecipeDetail(recipe: recipe)) {
-                                    ZStack(alignment: .topTrailing) {
-                                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                            .fill(.ultraThickMaterial)
-                                            .shadow(color: Color.black.opacity(0.10), radius: 10, x: 0, y: 6)
-                                        VStack(alignment: .leading, spacing: 10) {
-                                            ZStack(alignment: .topTrailing) {
-                                                AsyncImage(url: URL(string: recipe.photo_url_large)) { image in
-                                                    image.resizable()
-                                                        .aspectRatio(contentMode: .fill)
-                                                        .frame(width: 150, height: 150)
-                                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                                        .overlay(
-                                                            LinearGradient(colors: [.clear, Color.black.opacity(0.15)], startPoint: .top, endPoint: .bottom)
-                                                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                                                        )
-                                                } placeholder: {
-                                                    ProgressView()
-                                                        .frame(width: 150, height: 150)
-                                                }
-                                                Button(action: { onToggleFavorite(recipe) }) {
-                                                    Image(systemName: favoriteIDs.contains(recipe.id) ? "heart.fill" : "heart")
-                                                        .font(.system(size: 18, weight: .bold))
-                                                        .foregroundColor(.red.opacity(0.7))
-                                                        .padding(8)
-                                                        .background(Color.white.opacity(0.85))
-                                                        .clipShape(Circle())
-                                                        .shadow(radius: 2)
-                                                }
-                                                .padding([.top, .trailing], 8)
-                                            }
-                                            Text(recipe.name)
-                                                .font(.headline)
-                                                .bold()
-                                                .foregroundColor(Color.primary)
-                                            Text(recipe.cuisine)
-                                                .font(.subheadline)
-                                                .foregroundColor(.accentColor)
-                                                .padding(.horizontal, 10)
-                                                .padding(.vertical, 4)
-                                                .background(Capsule().fill(Color.accentColor.opacity(0.12)))
-                                            Spacer(minLength: 10)
-                                        }
-                                        .padding(10)
-                                    }
-                                    .padding(6)
+                                NavigationLink(destination: RecipeDetail(recipe: recipe, favoriteIDs: favoriteIDs, onToggleFavorite: onToggleFavorite)) {
+                                    FavoriteRecipeCard(recipe: recipe,
+                                                       isFavorite: favoriteIDs.contains(recipe.id),
+                                                       onToggleFavorite: onToggleFavorite)
                                 }
                             }
                         }
@@ -86,5 +44,59 @@ struct FavoriteRecipesView: View {
             }
             .padding()
         }
+    }
+}
+
+private struct FavoriteRecipeCard: View {
+    let recipe: Recipe
+    let isFavorite: Bool
+    let onToggleFavorite: (Recipe) -> Void
+
+    var body: some View {
+        ZStack(alignment: .topTrailing) {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .fill(.ultraThickMaterial)
+                .shadow(color: Color.black.opacity(0.10), radius: 10, x: 0, y: 6)
+            VStack(alignment: .leading, spacing: 10) {
+                ZStack(alignment: .topTrailing) {
+                    AsyncImage(url: URL(string: recipe.photo_url_large)) { image in
+                        image.resizable()
+                            .aspectRatio(contentMode: .fill)
+                            .frame(width: 150, height: 150)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(
+                                LinearGradient(colors: [.clear, Color.black.opacity(0.15)], startPoint: .top, endPoint: .bottom)
+                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                            )
+                    } placeholder: {
+                        ProgressView()
+                            .frame(width: 150, height: 150)
+                    }
+                    Button(action: { onToggleFavorite(recipe) }) {
+                        Image(systemName: isFavorite ? "heart.fill" : "heart")
+                            .font(.system(size: 18, weight: .bold))
+                            .foregroundColor(.red.opacity(0.7))
+                            .padding(8)
+                            .background(Color.white.opacity(0.85))
+                            .clipShape(Circle())
+                            .shadow(radius: 2)
+                    }
+                    .padding([.top, .trailing], 8)
+                }
+                Text(recipe.name)
+                    .font(.headline)
+                    .bold()
+                    .foregroundColor(Color.primary)
+                Text(recipe.cuisine)
+                    .font(.subheadline)
+                    .foregroundColor(.accentColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(Color.accentColor.opacity(0.12)))
+                Spacer(minLength: 10)
+            }
+            .padding(10)
+        }
+        .padding(6)
     }
 }

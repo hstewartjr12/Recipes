@@ -1,250 +1,127 @@
-//
-//  ContentView.swift
-//  Recipes
-//
-//  Created by Henry Stewart on 5/16/25.
-//
-
 import SwiftUI
 import SwiftData
 
-extension LinearGradient {
-    static let backgroundGradient = LinearGradient(
-        colors: [Color.accentColor.opacity(0.25), .orange.opacity(0.12), .white],
-        startPoint: .topLeading,
-        endPoint: .bottomTrailing
-    )
-}
-
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @State private var recipes: [Recipe] = []
-    @State private var response: RecipesJSONResponse = .init(recipes: [])
-    @State private var searchText: String = ""
-    
-    var filteredRecipes: [Recipe] {
-        guard !searchText.isEmpty else { return recipes }
-        return recipes.filter {
-            $0.name.localizedCaseInsensitiveContains(searchText) ||
-            $0.cuisine.localizedCaseInsensitiveContains(searchText)
-        }
+    @Environment(\.modelContext) private var context
+    @Query private var favorites: [Favorite]
+    @State private var catalog = RecipeCatalog()
+    @State private var search = ""
+    @State private var cookbookSearch = ""
+    @State private var cuisine = "All cuisines"
+    @State private var category = "All dishes"
+    @State private var sort = "A–Z"
+    @State private var error: String?
+
+    private var savedIDs: Set<String> { Set(favorites.map(\.recipeID)) }
+    private var cookbook: [Recipe] {
+        RecipeCatalog.unique(favorites.compactMap(\.recipe) + catalog.recipes.filter { savedIDs.contains($0.id) })
+    }
+    private var cuisines: [String] { ["All cuisines"] + Set(catalog.recipes.map(\.cuisine)).sorted() }
+    private var categories: [String] { ["All dishes"] + Set(catalog.recipes.map(\.category).filter { !$0.isEmpty }).sorted() }
+    private var shownRecipes: [Recipe] {
+        filter(catalog.recipes).filter { (cuisine == "All cuisines" || $0.cuisine == cuisine) && (category == "All dishes" || $0.category == category) }
+    }
+    private func filter(_ recipes: [Recipe], query search: String? = nil) -> [Recipe] {
+        let query = (search ?? self.search).trimmingCharacters(in: .whitespacesAndNewlines)
+        return recipes.filter { recipe in
+            query.isEmpty || ([recipe.name, recipe.cuisine, recipe.category] + recipe.ingredients.map(\.name))
+                .contains { $0.localizedCaseInsensitiveContains(query) }
+        }.sorted { sort == "Cuisine" ? ($0.cuisine, $0.name) < ($1.cuisine, $1.name) : $0.name.localizedStandardCompare($1.name) == .orderedAscending }
     }
 
-    var filteredFavoriteRecipes: [Recipe] {
-        guard !searchText.isEmpty else { return recipes.filter { favoriteIDs.contains($0.id) } }
-        return recipes.filter {
-            favoriteIDs.contains($0.id) && ($0.name.localizedCaseInsensitiveContains(searchText) || $0.cuisine.localizedCaseInsensitiveContains(searchText))
-        }
-    }
-    
-    @Query(sort: \Favorite.recipeID) private var favorites: [Favorite]
-    let columns = [GridItem(.flexible()), GridItem(.flexible())]
-    
-    var favoriteIDs: Set<String> { Set(favorites.map { $0.recipeID }) }
-    
     var body: some View {
         TabView {
-            Tab("Home", systemImage: "house") {
-                NavigationStack {
-                    HomeRecipesGrid(
-                        recipes: filteredRecipes,
-                        favoriteIDs: favoriteIDs,
-                        onToggleFavorite: toggleFavorite
-                    )
-                    .navigationTitle("")
-                }
-            }
-            
-            Tab("Favorites", systemImage: "heart.fill") {
-                NavigationStack {
-                    FavoriteRecipesView(
-                        recipes: filteredFavoriteRecipes,
-                        favoriteIDs: favoriteIDs,
-                        onToggleFavorite: toggleFavorite
-                    )
-                    .navigationTitle("")
-                }
-            }
-            
-            Tab(role: .search) {
-                NavigationStack {
-                    ZStack {
-                        LinearGradient.backgroundGradient.ignoresSafeArea()
-                        VStack(spacing: 4) {
-                            Text("Search Recipes")
-                                .font(.largeTitle)
-                                .bold()
-                                .foregroundStyle(LinearGradient(
-                                    colors: [.accentColor, .orange],
-                                    startPoint: .leading, endPoint: .trailing))
-                                .shadow(radius: 3)
-                            Text("Find the perfect dish to cook")
-                                .font(.subheadline)
-                                .foregroundColor(.secondary)
-                                .padding(.bottom, 5)
-                            ScrollView {
-                                LazyVStack(spacing: 14) {
-                                    ForEach(filteredRecipes) { recipe in
-                                        NavigationLink(destination: RecipeDetail(recipe: recipe, favoriteIDs: favoriteIDs, onToggleFavorite: toggleFavorite)) {
-                                            HStack(spacing: 14) {
-                                                AsyncImage(url: URL(string: recipe.photo_url_large)) { image in
-                                                    image.resizable()
-                                                        .aspectRatio(contentMode: .fill)
-                                                } placeholder: {
-                                                    ProgressView()
-                                                }
-                                                .frame(width: 52, height: 52)
-                                                .clipShape(RoundedRectangle(cornerRadius: 10))
-                                                VStack(alignment: .leading, spacing: 4) {
-                                                    Text(recipe.name)
-                                                        .font(.headline)
-                                                        .bold()
-                                                        .foregroundColor(Color.primary)
-                                                    Text(recipe.cuisine)
-                                                        .font(.subheadline)
-                                                        .foregroundColor(.accentColor)
-                                                        .padding(.horizontal, 10)
-                                                        .padding(.vertical, 2)
-                                                        .background(Capsule().fill(Color.accentColor.opacity(0.12)))
-                                                }
-                                                Spacer()
-                                                Button(action: { toggleFavorite(recipe) }) {
-                                                    Image(systemName: favoriteIDs.contains(recipe.id) ? "heart.fill" : "heart")
-                                                        .font(.system(size: 18, weight: .bold))
-                                                        .foregroundColor(.red.opacity(0.7))
-                                                        .padding(8)
-                                                        .background(Color.white.opacity(0.85))
-                                                        .clipShape(Circle())
-                                                        .shadow(radius: 2)
-                                                }
-                                            }
-                                            .padding(12)
-                                            .background(
-                                                RoundedRectangle(cornerRadius: 14, style: .continuous)
-                                                    .fill(.ultraThickMaterial)
-                                                    .shadow(color: Color.black.opacity(0.07), radius: 4, x: 0, y: 2)
-                                            )
-                                        }
-                                    }
-                                }
-                                .padding(.top, 18)
-                                .padding(.horizontal, 12)
-                            }
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        KitchenHeader(eyebrow: "A LITTLE INSPIRATION", title: "What sounds good?", subtitle: "Discover something worth making.")
+                        if search.isEmpty, cuisine == "All cuisines", category == "All dishes", let recipe = featuredRecipe {
+                            NavigationLink { RecipeDetail(recipe: recipe) } label: { FeaturedRecipe(recipe: recipe) }
+                                .buttonStyle(.plain)
                         }
-                        .padding(.horizontal)
-                    }
+                        if let message = catalog.message { statusBanner(message) }
+                        HStack {
+                            Menu { ForEach(cuisines, id: \.self) { value in Button(value) { cuisine = value } } } label: { Label(cuisine, systemImage: "globe") }
+                            Spacer()
+                            Menu { ForEach(categories, id: \.self) { value in Button(value) { category = value } } } label: { Label(category, systemImage: "fork.knife") }
+                        }
+                        .font(.subheadline.weight(.medium))
+                        HStack {
+                            Text("Explore the kitchen").font(.title3.weight(.bold))
+                            Spacer()
+                            Menu { Button("A–Z") { sort = "A–Z" }; Button("Cuisine") { sort = "Cuisine" } } label: { Image(systemName: "arrow.up.arrow.down") }
+                                .accessibilityLabel("Sort recipes, currently \(sort)")
+                        }
+                        if catalog.isLoading && catalog.recipes.isEmpty {
+                            ProgressView("Opening the kitchen…").frame(maxWidth: .infinity).padding(50)
+                        } else if shownRecipes.isEmpty {
+                            ContentUnavailableView {
+                                Label(catalog.recipes.isEmpty ? "The kitchen is quiet" : "No matching dishes", systemImage: "fork.knife")
+                            } description: {
+                                Text(catalog.recipes.isEmpty ? "Connect to load your first recipes." : "Try another ingredient, cuisine, or dish.")
+                            } actions: {
+                                Button(catalog.recipes.isEmpty ? "Try again" : "Clear filters") {
+                                    if catalog.recipes.isEmpty { Task { await catalog.load(force: true) } }
+                                    else { search = ""; cuisine = "All cuisines"; category = "All dishes" }
+                                }.buttonStyle(.borderedProminent).tint(KitchenStyle.accentFill)
+                            }
+                        } else {
+                            RecipeGrid(recipes: shownRecipes, favoriteIDs: savedIDs, onToggleFavorite: toggleFavorite)
+                        }
+                        Text("\(shownRecipes.count) recipes • Powered by TheMealDB")
+                            .font(.caption).foregroundStyle(.secondary).frame(maxWidth: .infinity)
+                        Link("Recipe catalogue & attribution", destination: URL(string: "https://www.themealdb.com")!)
+                            .font(.caption).frame(maxWidth: .infinity)
+                    }.padding(20).frame(maxWidth: 1050).frame(maxWidth: .infinity)
                 }
-            }
-        }
-        .searchable(text: $searchText)
-        .task {
-            do {
-                response = try await fetchData()
-                recipes = response.recipes
-            } catch {
-                print("Failed to fetch recipes:", error)
-            }
-        }
-    }
-    
-    func toggleFavorite(_ recipe: Recipe) {
-        if let favorite = favorites.first(where: { $0.recipeID == recipe.id }) {
-            modelContext.delete(favorite)
-        } else {
-            let newFavorite = Favorite(recipeID: recipe.id)
-            modelContext.insert(newFavorite)
-        }
-    }
-    
-    func fetchData() async throws -> RecipesJSONResponse {
-        let url = URL(string: "https://d3jbb8n5wk0qxi.cloudfront.net/recipes.json")!
-        let (data, _) = try await URLSession.shared.data(from: url)
-        return try JSONDecoder().decode(RecipesJSONResponse.self, from: data)
-    }
-}
+                .background(KitchenStyle.background)
+                .navigationTitle("Discover").kitchenInlineTitle()
+                .searchable(text: $search, prompt: "Dish, cuisine, or ingredient")
+                .refreshable { await catalog.load(force: true) }
+                .toolbar { ToolbarItem { Button { Task { await catalog.load(force: true) } } label: { Image(systemName: "arrow.clockwise") }.disabled(catalog.isLoading).accessibilityLabel("Refresh recipes") } }
+            }.tabItem { Label("Discover", systemImage: "leaf") }
 
-struct HomeRecipesGrid: View {
-    let recipes: [Recipe]
-    let favoriteIDs: Set<String>
-    let onToggleFavorite: (Recipe) -> Void
-    let columns = [GridItem(.flexible()), GridItem(.flexible())]
-    
-    var body: some View {
-        ZStack {
-            LinearGradient.backgroundGradient
-                .ignoresSafeArea()
-            VStack(spacing: 4) {
-                Text("Recipes")
-                    .font(.largeTitle)
-                    .bold()
-                    .foregroundStyle(LinearGradient(
-                        colors: [.accentColor, .orange],
-                        startPoint: .leading, endPoint: .trailing))
-                    .shadow(radius: 3)
-                Text("Discover & cook delicious meals")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .padding(.bottom, 5)
-                ScrollView(.vertical) {
-                    LazyVGrid(columns: columns, spacing: 24) {
-                        ForEach(recipes) { recipe in
-                            NavigationLink(destination: RecipeDetail(recipe: recipe, favoriteIDs: favoriteIDs, onToggleFavorite: onToggleFavorite)) {
-                                ZStack(alignment: .topTrailing) {
-                                    RoundedRectangle(cornerRadius: 18, style: .continuous)
-                                        .fill(.ultraThickMaterial)
-                                        .shadow(color: Color.black.opacity(0.10), radius: 10, x: 0, y: 6)
-                                    VStack(alignment: .leading, spacing: 10) {
-                                        ZStack(alignment: .topTrailing) {
-                                            AsyncImage(url: URL(string: recipe.photo_url_large)) { image in
-                                                image.resizable()
-                                                    .aspectRatio(contentMode: .fill)
-                                                    .frame(width: 150, height: 150)
-                                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                                    .overlay(
-                                                        LinearGradient(colors: [.clear, Color.black.opacity(0.15)], startPoint: .top, endPoint: .bottom)
-                                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                                    )
-                                            } placeholder: {
-                                                ProgressView()
-                                                    .frame(width: 150, height: 150)
-                                            }
-                                            Button(action: { onToggleFavorite(recipe) }) {
-                                                Image(systemName: favoriteIDs.contains(recipe.id) ? "heart.fill" : "heart")
-                                                    .font(.system(size: 18, weight: .bold))
-                                                    .foregroundColor(.red.opacity(0.7))
-                                                    .padding(8)
-                                                    .background(Color.white.opacity(0.85))
-                                                    .clipShape(Circle())
-                                                    .shadow(radius: 2)
-                                            }
-                                            .padding([.top, .trailing], 8)
-                                        }
-                                        Text(recipe.name)
-                                            .font(.headline)
-                                            .bold()
-                                            .foregroundColor(Color.primary)
-                                        Text(recipe.cuisine)
-                                            .font(.subheadline)
-                                            .foregroundColor(.accentColor)
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 4)
-                                            .background(Capsule().fill(Color.accentColor.opacity(0.12)))
-                                        Spacer(minLength: 10)
-                                    }
-                                    .padding(10)
-                                }
-                                .padding(6)
-                            }
+            NavigationStack {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 24) {
+                        KitchenHeader(eyebrow: "YOUR OWN COLLECTION", title: "The cookbook", subtitle: "The dishes you want to come back to.")
+                        FavoriteRecipesView(recipes: filter(cookbook, query: cookbookSearch), favoriteIDs: savedIDs, hasSavedRecipes: !cookbook.isEmpty, onClearSearch: { cookbookSearch = "" }, onToggleFavorite: toggleFavorite)
+                        let legacy = favorites.filter { favorite in favorite.recipe == nil && !catalog.recipes.contains(where: { $0.id == favorite.recipeID }) }
+                        if !legacy.isEmpty {
+                            Text("\(legacy.count) saves from the previous catalogue are retained. That service is no longer available; their IDs have not been deleted.")
+                                .font(.caption).foregroundStyle(.secondary)
                         }
-                    }
-                    .padding(.top, 10)
-                }
-            }
-            .padding(.horizontal)
+                    }.padding(20).frame(maxWidth: 1050).frame(maxWidth: .infinity)
+                }.background(KitchenStyle.background)
+                .navigationTitle("Cookbook").kitchenInlineTitle()
+                .searchable(text: $cookbookSearch, prompt: "Search your saved recipes")
+            }.tabItem { Label("Cookbook", systemImage: "book.closed") }
+
+            NavigationStack { MealPlannerView() }.tabItem { Label("Plan", systemImage: "calendar") }
+            NavigationStack { ShoppingListView() }.tabItem { Label("Shopping", systemImage: "basket") }
         }
+        .task { await catalog.load() }
+        .alert("Couldn't save your change", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
+            Button("OK", role: .cancel) { error = nil }
+        } message: { Text(error ?? "") }
+    }
+
+    private var featuredRecipe: Recipe? {
+        guard !catalog.recipes.isEmpty else { return nil }
+        let day = Calendar.current.ordinality(of: .day, in: .era, for: Date()) ?? 0
+        return catalog.recipes.sorted { $0.id < $1.id }[day % catalog.recipes.count]
+    }
+    @ViewBuilder private func statusBanner(_ text: String) -> some View {
+        Label(text, systemImage: "wifi.slash").font(.subheadline).foregroundStyle(.secondary)
+            .padding(14).frame(maxWidth: .infinity, alignment: .leading).background(KitchenStyle.surface, in: RoundedRectangle(cornerRadius: 16))
+    }
+    private func toggleFavorite(_ recipe: Recipe) {
+        if let favorite = favorites.first(where: { $0.recipeID == recipe.id }) { context.delete(favorite) }
+        else { context.insert(Favorite(recipe: recipe)) }
+        do { try context.save() } catch { context.rollback(); self.error = error.localizedDescription }
     }
 }
 
 #Preview {
-    ContentView()
+    ContentView().modelContainer(for: [Favorite.self, PlannedMeal.self, ShoppingItem.self, KitchenNote.self, CookingEvent.self], inMemory: true)
 }

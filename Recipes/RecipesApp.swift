@@ -13,7 +13,9 @@ struct RecipesApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
-                .modelContainer(for: Favorite.self)
+                .modelContainer(for: [Favorite.self, PlannedMeal.self, ShoppingItem.self, KitchenNote.self, CookingEvent.self])
+                .tint(KitchenStyle.accent)
+                .frame(minWidth: 360, minHeight: 600)
         }
     }
 }
